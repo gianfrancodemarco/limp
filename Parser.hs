@@ -1,578 +1,400 @@
 module Parser where
+import Grammar
+import Interpreter
 
-import Types (Variable(..), Env)
-import Data.Char
-import Control.Applicative
+-- Alessia Laforgia, mat.742292
+{- The main purpose of the parser is to build a tree with all the expressions to interpretate. 
+Once the tree is constructed, each character, each symbol, each element is associated to a certain semantics thanks to the interpreter -}
 
--- To allow the Parser type 
-newtype Parser a = P (Env -> String -> [(Env, a, String)])
+newtype Parser a = P (String -> [(a,String)])  
 
-parse :: Parser a -> Env -> String -> [(Env, a, String)]
-parse (P p) env input = p env input
+{-Functor, Applicative and Monad are classes already implemented in Prelude for the simple types. We need to implement them for the custom type
+Parser. -}
 
--- Our first parsing primitive is called item, which fails if the inptut string
---  is empty, and succeeds with the first character as the result value otherwise
-item :: Parser Char
-item = P (\env input -> case input of
-            [] -> []
-            (x:xs) -> [(env, x,xs)])
-
-
--- We need parser to be an instance of
-    -- Functor class
-    -- Applicative class
-    -- Monad class
-
--- 1. make Parser type into a  functor:
-instance Functor Parser where
+instance Functor Parser where 
     -- fmap :: (a -> b) -> Parser a -> Parser b
-    fmap g p = P (\env input -> case parse p env input of
-                [] -> []
-                [(env, v, out)] -> [(env, g v, out)])
+    fmap g (P p) = P (\input -> case p input of 
+        [] -> []
+        [(v, out)] -> [(g v, out)] 
+        ) 
 
-instance Applicative Parser where
-    -- pure :: a -> Parser a 
-    pure v = P (\env input -> [(env, v, input)])
+
+
+instance Applicative Parser where                     
+    --pure :: a -> Parser a 
+    pure v = P(\input -> [(v, input)])                
 
     -- <*> :: Parser (a -> b) -> Parser a -> Parser b
-    pg <*> px = P (\env input -> case parse pg env input of
-                     []        -> []
-                     [(env, g,out)] -> parse (fmap g px) env out)
-
-instance Monad Parser where
+    (P pg) <*> px = P(\input -> case pg input of  
+                [] -> []                              
+                [(g, out)] -> case fmap g px of        
+                                (P p) -> p out        
+                )                                     
+  
+instance Monad Parser where                         
     -- (>>=) :: Parser a -> (a -> Parser b) -> Parser b
-    p >>= f = P (\env input -> case parse p env input of
-                              []        -> []
-                              [(env, v,out)] -> parse (f v) env out)
+    (P p) >>= f = P (\input -> case p input of 
+                    [] -> []                    -- fail if the application fails
+                    [(v, out)] -> case f v of   -- apply f to the result v to give another parser f v 
+                                (P p) -> p out
+                    )
+                    
+class Monad f => Alternative f where  
+  empty :: f a
+  (<|>) :: f a -> f a -> f a
+  many :: f a -> f [a]
+  many x = some x <|> pure []
+
+  some :: f a -> f [a]
+  some x = pure (:) <*> x <*> many x
+
+  chain :: f a -> f (a -> a -> a) -> f a          -- chain operator
+  chain p op = do a <- p; rest a
+        where
+            rest a = (do f <- op; b <- p; rest (f a b)) <|> return a
 
 
-instance Alternative Parser where
-    -- empty :: Parser a
-    empty = P (\env input -> [])
+instance Alternative Parser where     
+  empty = P (const [])
 
-    -- (<|>) :: Parser a -> Parser a -> Parser a
-    p <|> q = P (\env input -> case parse p env input of
-                              []        -> parse q env input
-                              [(env,v,out)] -> [(env, v,out)])
+  (P p) <|> (P q) =
+    P( \input -> case p input of
+          [] -> q input
+          [(v, out)] -> [(v, out)]
+      )
 
 
----------------------------------------------------------------------------
--- In combination with sequencing and choice, these primitives can be used to
---  define a number of other useful parser. First of all, we define a parser
---  sat p for single characters that satisfy the predicate p
-satisfy :: (Char -> Bool) -> Parser Char 
-satisfy p = do x <- item
-               if p x then return x else empty
+-- Basic parsers--
 
--- Using satisfy for appropriate predicates from the lib. Data.Char, we can 
---  now define parsers for single digits, lower-case letters, upper-case letters,
---  arbitrary letters, alphanumeric characters, and specific characters
+item :: Parser Char
+item =
+    P (\input -> case input of
+        [] -> []
+        (x : xs) -> [(x, xs)])
 
-digit :: Parser Char
-digit = satisfy isDigit
+sat :: (Char -> Bool) -> Parser Char
+sat p =
+    do
+      x <- item
+      if p x then return x else empty -- return item defined above
 
-lower :: Parser Char
-lower = satisfy isLower
+digits :: [Char]
+digits = ['0' .. '9']
 
-upper :: Parser Char
-upper = satisfy isUpper
+isDigit :: Char -> Bool
+isDigit x = elem x digits
 
-letter :: Parser Char
-letter = satisfy isAlpha
+digitCase :: Parser Char
+digitCase = sat isDigit
 
-alphanum :: Parser Char
-alphanum = satisfy isAlphaNum
+lowers :: [Char]
+lowers = ['a' .. 'z']
+
+isLower :: Char -> Bool
+isLower x = elem x lowers
+
+lowerCase :: Parser Char
+lowerCase = sat isLower
+
+uppers :: [Char]
+uppers = ['A' .. 'Z']
+
+isUpper :: Char -> Bool
+isUpper x = elem x uppers
+
+upperCase :: Parser Char
+upperCase = sat isUpper
+
+isLetter :: Char -> Bool
+isLetter x = isUpper x || isLower x
+
+letterCase :: Parser Char
+letterCase = sat isLetter
+
+isAlphaNum :: Char -> Bool
+isAlphaNum x = isLetter x || isDigit x
+
+alphaNumCase :: Parser Char
+alphaNumCase = sat isAlphaNum
 
 char :: Char -> Parser Char
-char x = satisfy (== x)
+char x = sat (== x)
 
--- For example:
--- > parse (char 'a') [] "abc"
--- [([], 'a', "bc")]
+string :: String -> Parser String 
+string [] = return []
+string (x : xs) = 
+    do 
+        char x
+        string xs 
+        return (x : xs)
 
--- In turn, using char we can define a parser string xs for the string of char.s xs,
---  with the string itself returned as the result value:
-string :: String -> Parser String
-string []     = return []
-string (x:xs) = do char x
-                   string xs
-                   return (x:xs)
+anIdentifier :: Parser String  
+anIdentifier = 
+    do 
+        x <- letterCase
+        xs <- many alphaNumCase    -- Many takes from 0 to n
+        return (x : xs)
 
--- Using many and some, we can now define parsers for identifiers (variable names)
---  comprising a lower-case letter followed by zero or more alphanumeric characters,
---  natural numbers comprising one or more digits, and spacing comprising zero or more space,
---  tab, and newline char.s
 
-ident :: Parser String
-ident = do x <- lower
-           xs <- many alphanum
-           return (x:xs)
+-- Integer positive number
+natInt :: Parser Int        
+natInt =                   
+    do 
+        xs <- some digitCase
+        return (read xs)
 
-nat :: Parser Int
-nat = do xs <- some digit
-         return (read xs)
+--Integer positive and negative numbers
 
-space :: Parser ()
-space = do many (satisfy isSpace)
-           return ()
+int :: Parser Int                  
+int = 
+    do
+    char '-' 
+    n <- natInt
+    return (-n)
+    <|> natInt             
 
--- For example:
--- > parse ident "abc def"
--- [("abc"," def")]
---
--- > parse nat "123 abc"
--- [(123," abc")]
---
--- > parse space "   abc"
--- [((),"abc")]
---
 
-int :: Parser Int
-int = do char '-'
-         n <- nat
-         return (-n)
-       <|> nat
+spaces :: [Char]
+spaces = ['\n', '\t', '\r', ' ']
 
--- For example:
--- > parse int "-123 abc"
--- [(-123," abc")]
+isSpace :: Char -> Bool
+isSpace x = elem x spaces
 
--- obs. "1+2" and "1 + 2" are both parsed in the same way by real-life parsers
-token :: Parser a -> Parser a
-token p = do space
-             v <- p
-             space
-             return v 
+aSpace :: Parser ()               
+aSpace = do 
+            many (sat isSpace)        
+            return ()
 
--- Using token, we cna now define parsers that ignore spacing around identifiers,
---  natural numbers, integers, and special symbols:
-identifier :: Parser String
-identifier = token ident
 
-natural :: Parser Int
-natural = token nat
+token :: Parser a -> Parser a         -- deletes spaces
+token p =
+    do 
+        aSpace
+        v <- p
+        aSpace
+        return v
 
-integer :: Parser Int
+
+identifier :: Parser String           
+identifier = token anIdentifier
+
+naturalNumber :: Parser Int           
+naturalNumber = token natInt
+
+integer :: Parser Int                 
 integer = token int
 
-symbol :: String -> Parser String
+symbol :: String -> Parser String     
 symbol xs = token (string xs)
 
---------------------------------------------------------------
---------------------------------------------------------------
--- PARSERS THAT CONSUME STRINGS WITHOUT EVALUATING
+-- ARITHMETIC EVALUATION --
 
--- Aexps
--- aexp        ::= <aterm> + <aexp> | <aterm> - <aexp> | <aterm>
--- aterm       ::= <afactor> * <aterm> | <afactor>
--- afactor     ::= (<aexp>) | <integer> | <identifier
-consumeAexp :: Parser String
-consumeAexp = (do t <- consumeAterm
-                  symbol "+"
-                  a <- consumeAexp
-                  return (t ++ "+" ++ a))
-                <|>
-              (do t <- consumeAterm
-                  symbol "-"
-                  a <- consumeAexp
-                  return (t ++ "-" ++ a))
-                <|>
-              consumeAterm
+aExp  :: Parser ArithExpr         
+aExp = do chain aTerm op
+    where                        
+      op = 
+          do
+            symbol "+";
+            return Add
+          <|>
+          do
+            symbol "-";
+            return Sub
+
+aTerm :: Parser ArithExpr       
+aTerm = do chain aFactor op     
+    where 
+      op = 
+        do
+          symbol "*";
+          return Mul
+        <|>
+        do
+          symbol "/";
+          return Div
+        <|>
+        do
+          symbol "^";
+          return Power
+
+
+aFactor :: Parser ArithExpr
+aFactor = do (Constant <$> integer)
+          <|>
+          do
+            i <- identifier
+            return (ArithVariable i)
+          <|>
+          do
+            symbol "("
+            a <- aExp
+            symbol ")"
+            return a
+
+bExp :: Parser BoolExpr          
+bExp = chain bTerm op            
+  where op = do                  
+            symbol "Or"
+            return Or
+
+bTerm :: Parser BoolExpr        
+bTerm = chain bFact op        
+  where op = do
+            symbol "And"
+            return And
+
+bFact :: Parser BoolExpr
+bFact =
+  do
+    symbol "True"
+    return (Boolean True)
+    <|> do
+      symbol "False"
+      return (Boolean False)
+    <|> do
+      symbol "Not"
+      Not <$> bExp
+    <|> do
+      symbol "("
+      b <- bExp
+      symbol ")"
+      return b
+    <|> do 
+        a1 <- aExp 
+        do
+            symbol "<"
+            a2 <- aExp 
+            return (Lt a1 a2)
+            <|> do
+              symbol ">"
+              a2 <- aExp 
+              return (Gt a1 a2)
+            <|> do
+              symbol "<="
+              a2 <- aExp 
+              return (Lte a1 a2)
+            <|> do
+              symbol ">="
+              a2 <- aExp 
+              return (Gte a1 a2)
+            <|> do
+              symbol "=="
+              a2 <- aExp 
+              return (Eq a1 a2)
+            <|> do
+              symbol "!="
+              a2 <- aExp 
+              return (Neq a1 a2)
+    <|> (BoolVariable <$> identifier) 
+
+
+command :: Parser Command
+command =
+  arithDeclare
+    <|> boolDeclare 
+    <|> arithAssign
+    <|> boolAssign 
+    <|> ifElse
+    <|> whiledo
+    <|> skip 
+
+program :: Parser [Command]         
+program = do many command
+
+arithDeclare :: Parser Command
+arithDeclare =
+  do
+    symbol "int"              -- int id = 4;
+    i <- identifier
+    symbol "="
+    r <- ArithDeclare i <$> aExp      
+    symbol ";"
+    return r
+
+boolDeclare :: Parser Command
+boolDeclare =
+  do
+    symbol "bool"             -- bool id=True;
+    i <- identifier
+    symbol "="
+    r <- BoolDeclare i <$> bExp
+    symbol ";"
+    return r
+
+
+arithAssign :: Parser Command
+arithAssign =
+  do
+    i <- identifier
+    symbol "="
+    r <- ArithAssign i <$> aExp 
+    symbol ";"
+    return r
     
-    {-do { 
-                 t <- consumeAterm;
-                 (do symbol "+"
-                     a <- consumeAexp
-                     return (t ++ "+" ++ a))
-                  <|>
-                 (do symbol "-"
-                     a <- consumeAexp
-                     return (t ++ "-" ++ a))
-                  <|>
-                 return t
-                 -}
+boolAssign  :: Parser Command
+boolAssign  =
+  do
+    i <- identifier
+    symbol "="
+    r <- BoolAssign  i <$> bExp
+    symbol ";"
+    return r
 
-consumeAterm :: Parser String
-consumeAterm = (do f <- consumeAfactor
-                   symbol "*"
-                   t <- consumeAterm
-                   return (f ++ "*" ++ t))
-                <|>
-               consumeAfactor
+skip  :: Parser Command
+skip  =
+  do
+    symbol "skip"
+    symbol ";"
+    return Skip 
 
-consumeAfactor :: Parser String
-consumeAfactor = do symbol "("
-                    a <- consumeAexp
-                    symbol ")"
-                    return ("(" ++ a ++ ")")
-                <|>
-                 (do symbol "-"
-                     f <- consumeAfactor
-                     return ("-" ++ f))
-                <|>
-                 identifier
-                <|>
-                 (do i <- integer
-                     return (show i))
+ifElse :: Parser Command
+ifElse =
+  do
+    symbol "if"
+    symbol "("
+    b <- bExp
+    symbol ")"
+    symbol "{"
+    thenP <- program
+    symbol "}"
+    do
+      symbol "else"
+      symbol "{"
+      elseP <- program
+      symbol "}"
+      return (IfElse b thenP elseP)
+      <|> do
+        return (IfElse b thenP [Skip])
 
--- Bexps
--- bexp        ::= <bterm> OR <bexp> | <bterm>
--- bterm       ::= <bfactor> AND <bterm> | <bfactor>
--- bfactor     ::= true | false | !<bfactor> | (bexp) | <bcomparison>
--- bcomparison ::= <aexp> = <aexp> | <aexp> ≤ <aexp>
-
-consumeBexp :: Parser String
-consumeBexp = do t <- consumeBterm
-                 symbol "OR"
-                 b <- consumeBexp
-                 return (t ++ " OR " ++ b)
-              <|>
-              consumeBterm
-
-consumeBterm :: Parser String
-consumeBterm = (do f <- consumeBfactor
-                   symbol "AND"
-                   t <- consumeBterm
-                   return (f ++ " AND " ++ t))
-                <|>
-               consumeBfactor
-
-consumeBfactor :: Parser String
-consumeBfactor = (do symbol "True"
-                     return "True")
-                 <|>
-                 (do symbol "False"
-                     return "False")
-                 <|>
-                 (do symbol "!"
-                     f <- consumeBfactor
-                     return ("!" ++ f))
-                 <|>
-                 (do symbol "("
-                     b <- consumeBexp
-                     symbol ")"
-                     return ("(" ++ b ++ ")"))
-                 <|>
-                 consumeBcomparison
-
--- bcomparison ::= <aexp> = <aexp> | <aexp> ≤ <aexp>
-consumeBcomparison :: Parser String
-consumeBcomparison = (do a0 <- consumeAexp
-                         symbol "="
-                         a1 <- consumeAexp
-                         return (a0 ++ "=" ++ a1))
-                     <|>
-                     (do a0 <- consumeAexp
-                         symbol "<="
-                         a1 <- consumeAexp
-                         return (a0 ++ "<=" ++ a1))
-
--- Commands
--- program     ::= <command> <program> | <command>
--- command     ::= <assignment> | <ifThenElse> | <while> | skip;
--- assignment  ::= <identifier> := <aexp>; 
--- ifThenElse  ::= if (<bexp>) { <program> } | if (<bexp>) {<program>} else {<program>}
--- while       ::= while (<bexp>) {<program>}
-parseProgram :: Parser String
-parseProgram = (do c <- consumeCommand
-                   p <- parseProgram
-                   return (c ++ p))
-                <|>
-                consumeCommand
-
-consumeCommand :: Parser String
-consumeCommand = consumeAssignment
-                 <|>
-                 consumeIfThenElse
-                 <|>
-                 consumeWhile
-                 <|>
-                 (do symbol "skip"
-                     symbol ";"
-                     return "skip;")
-
-consumeAssignment :: Parser String
-consumeAssignment = do x <- identifier
-                       symbol ":="
-                       a <- consumeAexp
-                       symbol ";"
-                       return (x ++ ":=" ++ a ++ ";")
-
-consumeIfThenElse :: Parser String
-consumeIfThenElse = do{ symbol "if";
-                        b <- consumeBexp;
-                        symbol "{";
-                        p0 <- parseProgram;
-                        symbol "}";
-                        do { 
-                           symbol "else";
-                           symbol "{";
-                           p1 <- parseProgram;
-                           symbol "}";
-                           return ("if " ++ b ++ " {" ++ p0 ++ "}else{" ++ p1 ++ "}"); }
-                        <|>
-                        return ("if " ++ b ++ " {" ++ p0 ++ "}");
-                    }
-
-consumeWhile :: Parser String
-consumeWhile = do symbol "while"
-                  b <- consumeBexp
-                  symbol "{"
-                  p <- parseProgram
-                  symbol "}"
-                  return ("while " ++ b ++ " {" ++ p ++ "}")
---------------------------------------------------------------
---------------------------------------------------------------
--- ENVIRONMENT
--- data Variable = Variable { name :: String, vtype :: String, value :: Int }
---                deriving Show
--- 
--- type Env = [Variable]
---------------------------------------------------------------
-
--- Update the environment with a variable
--- If the variable is new (not declared before), it will added to the environment
--- If the variable is existing, its value will be overwritten in.
-updateEnv :: Variable -> Parser String
-updateEnv var = P (\env input -> case input of 
-                     xs -> [((modifyEnv env var),"",xs)])
-                        
-modifyEnv :: Env -> Variable -> Env
-modifyEnv [] var = [var]
-modifyEnv (x:xs) newVar = if (name x) == (name newVar) then [newVar] ++ xs
-                          else [x] ++ modifyEnv xs newVar
-
--- Return the value of a variable given the name
-readVariable :: String -> Parser Int
-readVariable name = P (\env input -> case searchVariable env name of
-    [] -> []
-    [value] -> [(env, value, input)])
-
--- Search the value of a variable stored in the Env. given the name
-searchVariable :: Env -> String -> [Int]
-searchVariable []     queryname = []
-searchVariable (x:xs) queryname = if (name x) == queryname then [(value x)]
-                                  else searchVariable xs queryname
+whiledo :: Parser Command
+whiledo =
+  do
+    symbol "whiledo"
+    symbol "("
+    b <- bExp
+    symbol ")"
+    symbol "{"
+    p <- program
+    symbol "}"
+    return (Whiledo b p)
 
 
+-- MAIN PARSE FUNCTIONS
+
+parse :: String -> ([Command], String)
+parse s = case p s of
+  [] -> ([], "")
+  [(c, s)] -> (c, s)
+  where
+    (P p) = program
 
 
+parseFailed :: ([Command], String) -> Bool
+parseFailed (_, "") = False
+parseFailed (_, _) = True
 
+getParsedCommands :: ([Command], String) -> [Command]
+getParsedCommands (c, _) = c
 
-
-
---TODO
-
--- module Grammar where
---  import Parser (Parser(..))
--- import Types (Variable(..))
-
---------------------------------------------------------------
--- ARTIHMETIC EXPRESSIONS
--- aexp        ::= <aterm> + <aexp> | <aterm> - <aexp> | <aterm>
--- aterm       ::= <afactor> * <aterm> | <afactor>
--- afactor     ::= (<aexp>) | <integer> | <identifier>
---
--- examples:
-{-
-*Main> parse aexp [] "2"
-[([],2,"")]
-*Main> parse aexp [] "2+3"
-[([],5,"")]
-*Main> parse aexp [] "2+3*8"
-[([],26,"")]
-*Main>
--}
---------------------------------------------------------------
-
-aexp :: Parser Int
-aexp = (do t <- aterm
-           symbol "+"
-           a <- aexp
-           return (t+a))
-        <|>
-       (do t <- aterm
-           symbol "-"
-           a <- aexp
-           return (t-a))
-        <|>
-       aterm
-    {-do {
-          t <- aterm;
-          do { symbol "+"
-             ; e <- aexp
-             ; return (t + e); }
-           <|>
-          do { symbol "-"
-             ; e <- aexp
-             ; return (t - e); }
-           <|>
-          return t;
-          }-}
-
-
-aterm :: Parser Int
-aterm = do { f <- afactor
-           ; symbol "*"
-           ; t <- aterm
-           ; return (t * f)
-            }
-            <|>
-            afactor
-
-afactor :: Parser Int
-afactor = (do symbol "("
-              a <- aexp
-              symbol ")"
-              return a)
-            <|>
-          (do i <- identifier
-              readVariable i)
-            <|>
-          integer
-    {-do {
-              symbol "("
-            ; e <- aexp
-            ; symbol ")"
-            ; return e }
-           <|>
-          do {
-              i <- identifier
-            ; readVariable i
-          }
-           <|>
-           integer-}
-
---------------------------------------------------------------
---------------------------------------------------------------
--- BOOLEAN EXPRESSIONS
--- bexp        ::= <bterm> OR <bexp> | <bterm>
--- bterm       ::= <bfactor> AND <bterm> | <bfactor>
--- bfactor     ::= true | false | !<bfactor> | (bexp) | <b
--- bcomparison ::= <aexp> = <aexp> | <aexp> ≤ <aexp>
---------------------------------------------------------------
-
-bexp :: Parser Bool
-bexp =  (do b0 <- bterm
-            symbol "OR"
-            b1 <- bexp
-            return (b0 || b1))
-        <|>
-        bterm
-
-bterm :: Parser Bool
-bterm = (do f0 <- bfactor
-            symbol "AND"
-            f1 <- bterm
-            return (f0 && f1))
-        <|>
-        bfactor
-
-bfactor :: Parser Bool
-bfactor = (do symbol "True"
-              return True)
-          <|>
-          (do symbol "False"
-              return False)
-          <|>
-          (do symbol "!"
-              b <- bfactor
-              return (not b))
-          <|>
-          (do symbol "("
-              b <- bexp
-              symbol ")"
-              return b)
-          <|>
-          bcomparison
-
-bcomparison :: Parser Bool
-bcomparison = (do a0 <- aexp
-                  symbol "="
-                  a1 <- aexp
-                  return (a0 == a1))
-                <|>
-              (do a0 <- aexp
-                  symbol "<="
-                  a1 <- aexp
-                  return (a0 <= a1))
-
---------------------------------------------------------------
---------------------------------------------------------------
--- COMMAND EXPRESSIONS
--- program     ::= <command> | <command> <program>
--- command     ::= <assignment> | <ifThenElse> | <while> | skip;
--- assignment  ::= <identifier> := <aexp>;
--- ifThenElse  ::= if (<bexp>) { <program> } | if (<bexp>) {<program>} else {<program>}
--- while       ::= while (<bexp>) {<program>}
---------------------------------------------------------------
-
-program :: Parser String
-program = (do command
-              program)
-          <|>
-          command
-
-command :: Parser String
-command = assignment
-           <|>
-          ifThenElse
-           <|>
-          while
-           <|>
-          (do symbol "skip"
-              symbol ";")
-
-assignment :: Parser String
-assignment = do x <- identifier
-                symbol ":="
-                v <- aexp
-                symbol ";"
-                updateEnv Variable{name=x, vtype="", value=v}
-
-ifThenElse :: Parser String
-ifThenElse = (do symbol "if"
-                 b <- bexp
-                 symbol "{"
-                 if (b) then
-                     (do program
-                         symbol "}"
-                         (do symbol "else"
-                             symbol "{"
-                             parseProgram;
-                             symbol "}"
-                             return "")
-                            <|>
-                            (return ""))
-                 else
-                     (do parseProgram
-                         symbol "}"
-                         (do symbol "else"
-                             symbol "{"
-                             program
-                             symbol "}"
-                             return "")
-                          <|>
-                          return "")
-                        )
-
-while :: Parser String
-while = do w <- consumeWhile
-           repeatWhile w
-           symbol "while"
-           --symbol "("
-           b <- bexp
-           --symbol ")"
-           symbol "{"
-           if (b) then
-               (do program
-                   symbol "}"
-                   repeatWhile w
-                   while)
-           else
-               (do parseProgram
-                   symbol "}"
-                   return "")
-
-repeatWhile :: String -> Parser String
-repeatWhile c = P(\env input -> [(env, "", c ++ input)])
+getRemainingInput :: ([Command], String) -> String
+getRemainingInput (_, s) = s
