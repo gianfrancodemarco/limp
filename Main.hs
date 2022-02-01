@@ -2,92 +2,110 @@ module Main where
 import Interpreter
 import Grammar
 import Parser
+import Control.Exception
 
---  Alessia Laforgia mat.742292
---  Here i have the Main module of my interpreter. From the menu described in this piece of code, i can access and use A-LImp in the two modalities i've defined:
--- 1) Running a file with a program to run;
--- 2) Writing a program all in one line and run it directly.
+--  author: Gianfranco Demarco
+--  This is the Mani module of the program. It is responsible of running the top-level layer of the interpreter, which show the menu and then executes the parsed code.
+--  The execution modes are:
+--    1) Read the program from a file;
+--    2) Read the program from cli as a one liner.
 
 
-choices :: [(Int, (String, IO ()))]                     -- Display of the choices
+-- Returns the choices for the menu
+choices :: [(Int, (String, IO ()))]
 choices = zip [1, 2, 3] [
    ("Run a program from a file", readFromFile),
    ("Write your program in a line", readFromCLI),
    ("Exit", esc )
  ]
 
-
-main :: IO ()
-main = do
-      putStrLn . unlines $ map format choices
-      choice <- getLine
-      case validate choice of
-         Just n  -> execute . read $ choice           -- when a line is correctly inserted the choice is evaluated
-         Nothing -> putStrLn "Please try again"       -- when line is not inserted correctly
-
-      main
-   where format (i, (text, _)) = show i ++ ") " ++ text   -- displaying the choices in a certain string format
-
-validate :: String -> Maybe Int                          -- This function validates the inserted choice, if it's valid or not. 
-validate s = isValid (reads s)
-   where isValid []            = Nothing
-         isValid ((n, _):_) 
-               | outOfBounds n = Nothing
-               | otherwise     = Just n
-         outOfBounds n = (n < 1) || (n > length choices)
+ -- Checks if the user has made a legal choice
+validate :: Int -> Maybe Int
+validate n | outOfBounds n = Nothing
+           | otherwise     = Just n
+           where
+             outOfBounds n = (n < 1) || (n > length choices)
 
 
-execute :: Int -> IO ()                                 -- executes the main
+-- executes the main
+execute :: Int -> IO ()
 execute n = doExec $ filter (\(i, _) -> i == n) choices
    where doExec ((_, (_,f)):_) = f
 
--- Here i implement the body for each of the choices of the menu
+
+
+
+-- Section: choice
+
 
 -- First option
 
 readFromFile =
   do     
   putStrLn "Enter the name of the file you want to run:"
-  input <- getLine; 
-  p <- readFile input
-  let c = parse p
-  if parseFailed c
+  filename <- getLine;
+  fileContent <- readFile filename
+  let parsed = parse fileContent
+  if parseFailed parsed
     then do
       putStrLn "\nParsing failed\n"
       putStrLn "\nRemaining input:\n"
-      print (getRemainingInput c)
+      print (getRemainingInput parsed)
   else do
       putStrLn "\nParsing success!\n"
-      let s = execProgr [] (getParsedCommands c)
+      let state = executeProgram [] (getParsedCommands parsed)
       putStrLn "\nInput Program\n"
-      putStrLn p
+      putStrLn fileContent
       putStrLn "\nRepresentation of the program:\n"
-      print (getParsedCommands c)
+      print (getParsedCommands parsed)
       putStrLn "\nState of the memory:\n"
-      print s
+      print state
 
 
 -- Second option
 readFromCLI =
   do
   putStrLn "Write a program all in one line:"
-  string <- getLine;
-  let c = parse string
-  if parseFailed c
+  inputProgram <- getLine;
+  let parsed = parse inputProgram
+  if parseFailed parsed
      then do
       putStr "\nParsing failed\n"
       putStr "\nRemaining input:"
-      print (getRemainingInput c)
+      print (getRemainingInput parsed)
   else do
       putStrLn "\nParsing success!\n"
-      let s = execProgr [] (getParsedCommands c)
+      let state = executeProgram [] (getParsedCommands parsed)
       putStr "\nInput Program\n"
-      putStr string
+      putStr inputProgram
       putStr "\nRepresentation of the program:\n"
-      print (getParsedCommands c)
+      print (getParsedCommands parsed)
       putStr "\nState of the memory:\n"
-      print s 
+      print state
 
 -- Third option
 esc = do error "Exit from the program! Goodbye!"
-      
+
+-- End section choice
+
+main :: IO ()
+main = do
+
+      putStrLn formattedChoices
+      tryChoice <- try (readLn :: IO Int) :: IO (Either SomeException Int)
+
+      case tryChoice of
+        Left ex -> tryAgain
+        Right choice ->
+          do
+            case validate choice of
+               -- when the choice is valid it is evaluated
+               Just n  -> execute choice
+               Nothing -> tryAgain
+
+      where tryAgain = do
+                         putStrLn "Please try again"
+                         main
+
+            format (i, (text, _)) = show i ++ ") " ++ text   -- displaying the choices in a certain string format
+            formattedChoices = unlines (map format choices)

@@ -1,21 +1,19 @@
 module Grammar where 
 
--- Alessia Laforgia, mt.742292
-
--- In this module i'm going to describe the Grammar of my A-LImp language.
+-- author: Gianfranco Demarco
 
 
 data Type = 
           IntType Int      -- all the types that i can manage in my Interpreter
         | BoolType Bool 
         | ArrayType [Int]
-        deriving Show 
+        deriving Show
 
 
 data ArithExpr =              -- all expression that give Integer as result
           Constant Int
         | ArithVariable String
-        | ArrVariable String ArithExpr   
+        | ArrVariable String ArithExpr
         | Add ArithExpr ArithExpr
         | Sub ArithExpr ArithExpr
         | Mul ArithExpr ArithExpr
@@ -47,7 +45,7 @@ data BoolExpr =                -- all expression that give Bool as result
 data Command =
           Skip
         | IfElse BoolExpr [Command] [Command] -- probabile lista di comandi
-  | Whiledo BoolExpr [Command]
+  | While BoolExpr [Command]
   | ArithAssign String ArithExpr
         | BoolAssign String BoolExpr  
         | ArrAssign String ArithExpr ArithExpr --nome array + indice + numero da mettere all'interno

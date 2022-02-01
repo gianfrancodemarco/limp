@@ -1,37 +1,34 @@
 module Interpreter where
 import Grammar
 
--- Alessia Laforgia, mat.742292
--- The Intepreter is the part of our program that takes in input the intermediate representation tree and gives it a meaning, that is exactly the semantic.
+-- author: Gianfranco Demarco
+-- The Interpreter is the module that takes in input the intermediate representation tree of the program and extracts the semantics
 
--- These are the components of the Environment
 
-data Variable = Variable {name  :: String,
-                          value :: Type } deriving Show
+-- The Environment, representing the state of the program, is an array of Variables
+-- A Variable is an object defined by a name::string and a value::Type
 
--- Array of tuples of type Variable
-
+data Variable = Variable {name :: String, value :: Type } deriving Show
 type Env = [Variable]
 
--- I define the operations to exploit the Env
 
--- This modifies the Environment after some modification to variables.
 
-modifyEnv :: Env -> Variable -> Env 
-modifyEnv [] var = [var]
-modifyEnv (x:xs) newVar = if (name x) == (name newVar) then [
-    newVar] ++ xs 
-                        else[x] ++ modifyEnv xs newVar
+-- We need two operations for the Env:
+-- read: returns the value of a variable in the store if present, else raise an error
+-- write: writes or updates the value of a variable in the store
+
+writeEnv :: Env -> Variable -> Env
+writeEnv [] var = [var]
+writeEnv (x:xs) var | (name x == name var) = [var] ++ xs              -- If we find the var, replace with the new one
+                    | otherwise            = [x] ++ writeEnv xs var
 
 
 -- This returns the value of the variable 
 
-searchVariable:: Env -> String-> Maybe Type
-searchVariable [] varname = Nothing
-searchVariable (x:xs) varname = if (name x) == varname
-        then Just (value x)
-                                else searchVariable xs
-                                varname
+readEnv:: Env -> String-> Maybe Type
+readEnv [] varName = Nothing
+readEnv (x:xs) varName | name x == varName = Just (value x)
+                       | otherwise         = readEnv xs varName
 
 
 --ARITHMETIC EXPRESSION EVALUATION--
@@ -41,7 +38,7 @@ arithExprEval:: Env -> ArithExpr -> Maybe Int
 arithExprEval env (Constant i) = Just i
 
 arithExprEval env (ArithVariable i) = 
-        case searchVariable env i of
+        case readEnv env i of
                 Just (IntType v)-> Just v
                 Just _ -> error "type mismatch"
                 Nothing -> error "undeclared variable"
@@ -66,7 +63,7 @@ boolExprEval :: Env -> BoolExpr -> Maybe Bool
 boolExprEval env (Boolean b) = Just b
 
 boolExprEval env (BoolVariable s)=
-        case searchVariable env s of 
+        case readEnv env s of
                 Just (BoolType v) -> Just v
                 Just _ -> error "type mismatch"
                 Nothing -> error "undeclared variable"
@@ -89,58 +86,63 @@ boolExprEval env (Or a b) = pure (||) <*> (boolExprEval env a) <*> (boolExprEval
 
 boolExprEval env (Not a) = not <$> boolExprEval env a
 
--- EXECUTION OF THE PROGRAM--
-
-execProgr :: Env -> [Command] -> Env
-
-execProgr e [] = e 
-
-execProgr e  (Skip : cs) = execProgr e cs
-
-execProgr e ((IfElse b nc nc') : cs) =
-        case boolExprEval e b of
-                Just True -> execProgr e (nc ++ cs)
-                Just False-> execProgr e (nc'++ cs)
-                Nothing -> error "Error if"
 
 
-execProgr e ((Whiledo b nc) : cs) =
-        case boolExprEval e b of
-                Just True -> execProgr e (nc ++ [(Whiledo b nc)] ++ cs)
-                Just False -> execProgr e cs
+-- Program Flow --
+
+executeProgram :: Env -> [Command] -> Env
+
+-- Execute nothing, env unaltered
+executeProgram env [] = env
+
+-- Execute skip --> execute rest of commands
+executeProgram env (Skip : restOfCommands) = executeProgram env restOfCommands
+
+
+executeProgram env ((IfElse predicate ifBranch elseBranch) : restOfCommands) =
+        case boolExprEval env predicate of
+                Just True -> executeProgram env (ifBranch ++ restOfCommands)
+                Just False-> executeProgram env (elseBranch ++ restOfCommands)
+                Nothing -> error "Error on IfElse evaluation"
+
+
+executeProgram env ((While predicate whileBody) : restOfCommands) =
+        case boolExprEval env predicate of
+                Just True -> executeProgram env (whileBody ++ [(While predicate whileBody)] ++ restOfCommands)
+                Just False -> executeProgram env restOfCommands
                 Nothing -> error "Error while"
 
-execProgr e ((ArithAssign s a) : cs ) =
-        case searchVariable e s of
-                Just (IntType _ ) -> execProgr (modifyEnv e var) cs
-                               where var = Variable s (IntType z)
-                                        where Just z = arithExprEval e a
-                Just _ -> error "Type mismatch"
-                Nothing -> error "Error assign" 
+executeProgram env ((ArithAssign identifier aExp) : restOfCommands) =
+        case readEnv env identifier of
+                Just (IntType _ ) -> executeProgram (writeEnv env var) restOfCommands
+                               where var = Variable identifier (IntType evaluated)
+                                        where Just evaluated = arithExprEval env aExp
+                Just _ -> error "Type mismatch in ArithAssign"
+                Nothing -> error "Error in ArithAssign"
 
 
-execProgr e ((BoolAssign s b) : cs ) =
-        case searchVariable e s of
-                Just (BoolType _ ) -> execProgr (modifyEnv e var) cs
-                               where var = Variable s (BoolType z)
-                                        where Just z = boolExprEval e b
-                Just _ -> error "Type mismatch"
-                Nothing -> error "Error assign" 
+executeProgram env ((BoolAssign identifier bExp) : restOfCommands) =
+        case readEnv env identifier of
+                Just (BoolType _ ) -> executeProgram (writeEnv env var) restOfCommands
+                               where var = Variable identifier (BoolType evaluated)
+                                        where Just evaluated = boolExprEval env bExp
+                Just _ -> error "Type mismatch in BoolAssign"
+                Nothing -> error "Error in BoolAssign"
 
-execProgr e (( ArithDeclare s a ) : cs ) =
-        case arithExprEval e a of
-                Just exp -> case searchVariable e s of
-                        Just _ -> error "double declaration"
-                        Nothing -> execProgr (modifyEnv e var) cs
-                               where var = Variable s (IntType z)
-                                        where Just z = arithExprEval e a
-                Nothing -> error "Error declare"
+executeProgram env (( ArithDeclare identifier aExp ) : restOfCommands ) =
+        case arithExprEval env aExp of
+                Just exp -> case readEnv env identifier of
+                        Just _ -> error "double ArithDeclare"
+                        Nothing -> executeProgram (writeEnv env var) restOfCommands
+                               where var = Variable identifier (IntType evaluated)
+                                        where Just evaluated = arithExprEval env aExp
+                Nothing -> error "Error in ArithDeclare"
 
-execProgr e (( BoolDeclare s a ) : cs ) =
-        case boolExprEval e a of
-                Just exp -> case searchVariable e s of
-                        Just _ -> error "double declaration"
-                        Nothing -> execProgr (modifyEnv e var) cs
-                               where var = Variable s (BoolType z)
-                                        where Just z = boolExprEval e a
-                Nothing -> error "Error declare"
+executeProgram env (( BoolDeclare identifier bExp ) : restOfCommands ) =
+        case boolExprEval env bExp of
+                Just exp -> case readEnv env identifier of
+                        Just _ -> error "double BoolDeclare"
+                        Nothing -> executeProgram (writeEnv env var) restOfCommands
+                               where var = Variable identifier (BoolType evaluated)
+                                        where Just evaluated = boolExprEval env bExp
+                Nothing -> error "Error in BoolDeclare"

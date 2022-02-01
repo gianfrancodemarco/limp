@@ -2,7 +2,7 @@ module Parser where
 import Grammar
 import Interpreter
 
--- Alessia Laforgia, mat.742292
+-- author: Gianfranco Demarco
 {- The main purpose of the parser is to build a tree with all the expressions to interpretate. 
 Once the tree is constructed, each character, each symbol, each element is associated to a certain semantics thanks to the interpreter -}
 
@@ -295,7 +295,7 @@ command =
     <|> arithAssign
     <|> boolAssign 
     <|> ifElse
-    <|> whiledo
+    <|> while
     <|> skip 
 
 program :: Parser [Command]         
@@ -355,28 +355,28 @@ ifElse =
     b <- bExp
     symbol ")"
     symbol "{"
-    thenP <- program
+    ifBranch <- program
     symbol "}"
     do
       symbol "else"
       symbol "{"
-      elseP <- program
+      elseBranch <- program
       symbol "}"
-      return (IfElse b thenP elseP)
+      return (IfElse b ifBranch elseBranch)
       <|> do
-        return (IfElse b thenP [Skip])
+        return (IfElse b ifBranch [Skip])
 
-whiledo :: Parser Command
-whiledo =
+while :: Parser Command
+while =
   do
-    symbol "whiledo"
+    symbol "while"
     symbol "("
     b <- bExp
     symbol ")"
     symbol "{"
     p <- program
     symbol "}"
-    return (Whiledo b p)
+    return (While b p)
 
 
 -- MAIN PARSE FUNCTIONS
