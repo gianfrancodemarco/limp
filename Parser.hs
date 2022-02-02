@@ -187,6 +187,7 @@ integer = token int
 symbol :: String -> Parser String     
 symbol xs = token (string xs)
 
+
 -- ARITHMETIC EVALUATION --
 
 aExp  :: Parser ArithExpr         
@@ -290,62 +291,26 @@ bFact =
 
 command :: Parser Command
 command =
-  arithDeclare
-    <|> boolDeclare 
-    <|> arithAssign
-    <|> boolAssign 
-    <|> ifElse
-    <|> while
-    <|> skip 
+  skip <|>
+  ifElse <|>
+  while <|>
+  arithDeclare <|>
+  boolDeclare <|>
+  arrayDeclare <|>
+  arithAssign <|>
+  boolAssign <|>
+  arrayAssign
 
 program :: Parser [Command]         
 program = do many command
 
-arithDeclare :: Parser Command
-arithDeclare =
-  do
-    symbol "int"              -- int id = 4;
-    i <- identifier
-    symbol "="
-    r <- ArithDeclare i <$> aExp      
-    symbol ";"
-    return r
-
-boolDeclare :: Parser Command
-boolDeclare =
-  do
-    symbol "bool"             -- bool id=True;
-    i <- identifier
-    symbol "="
-    r <- BoolDeclare i <$> bExp
-    symbol ";"
-    return r
-
-
-arithAssign :: Parser Command
-arithAssign =
-  do
-    i <- identifier
-    symbol "="
-    r <- ArithAssign i <$> aExp 
-    symbol ";"
-    return r
-    
-boolAssign  :: Parser Command
-boolAssign  =
-  do
-    i <- identifier
-    symbol "="
-    r <- BoolAssign  i <$> bExp
-    symbol ";"
-    return r
 
 skip  :: Parser Command
 skip  =
   do
     symbol "skip"
     symbol ";"
-    return Skip 
+    return Skip
 
 ifElse :: Parser Command
 ifElse =
@@ -378,6 +343,67 @@ while =
     symbol "}"
     return (While b p)
 
+
+arithDeclare :: Parser Command
+arithDeclare =
+  do
+    symbol "int"              -- int id = 4;
+    i <- identifier
+    symbol "="
+    r <- ArithDeclare i <$> aExp      
+    symbol ";"
+    return r
+
+boolDeclare :: Parser Command
+boolDeclare =
+  do
+    symbol "bool"             -- bool id=True;
+    i <- identifier
+    symbol "="
+    r <- BoolDeclare i <$> bExp
+    symbol ";"
+    return r
+
+arrayDeclare :: Parser Command
+arrayDeclare =
+  do
+    symbol "array"
+    i <- identifier
+    symbol "["
+    length <- aExp
+    symbol "]"
+    symbol ";"
+    return (ArrayDeclare i length)
+
+arithAssign :: Parser Command
+arithAssign =
+  do
+    i <- identifier
+    symbol "="
+    r <- ArithAssign i <$> aExp 
+    symbol ";"
+    return r
+    
+boolAssign  :: Parser Command
+boolAssign  =
+  do
+    i <- identifier
+    symbol "="
+    r <- BoolAssign  i <$> bExp
+    symbol ";"
+    return r
+
+arrayAssign :: Parser Command
+arrayAssign =
+  do
+    i <- identifier
+    symbol "["
+    length <- aExp
+    symbol "]"
+    symbol "="
+    value <- aExp
+    symbol ";"
+    return (ArrayAssign i length value)
 
 -- MAIN PARSE FUNCTIONS
 

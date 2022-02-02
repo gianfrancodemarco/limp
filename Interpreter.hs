@@ -1,5 +1,6 @@
 module Interpreter where
 import Grammar
+import Array
 
 -- author: Gianfranco Demarco
 -- The Interpreter is the module that takes in input the intermediate representation tree of the program and extracts the semantics
@@ -146,3 +147,20 @@ executeProgram env (( BoolDeclare identifier bExp ) : restOfCommands ) =
                                where var = Variable identifier (BoolType evaluated)
                                         where Just evaluated = boolExprEval env bExp
                 Nothing -> error "Error in BoolDeclare"
+
+executeProgram env (( ArrayDeclare identifier lengthaExp ) : restOfCommands ) =
+         case readEnv env identifier of
+                Just _ -> error "double ArrayDeclare"
+                Nothing -> executeProgram (writeEnv env var) restOfCommands
+                        where var = Variable identifier (ArrayType (getFilledArray length))
+                              where Just length = arithExprEval env lengthaExp
+
+executeProgram env (( ArrayAssign identifier indexaExp valueaExp ) : restOfCommands ) =
+        case readEnv env identifier of
+              Just (ArrayType array) -> executeProgram (writeEnv env var) restOfCommands
+                  where var = Variable identifier (ArrayType (replaceElemAt array index value))
+                              where
+                                    Just index = arithExprEval env indexaExp
+                                    Just value = arithExprEval env valueaExp
+              Just _ -> error "Type mismatch in ArrayAssign"
+              Nothing -> error "Trying to assign to an array that has not been declared"

@@ -5,7 +5,7 @@ module Grammar where
 
 data Type = 
           IntType Int      -- all the types that i can manage in my Interpreter
-        | BoolType Bool 
+        | BoolType Bool
         | ArrayType [Int]
         deriving Show
 
@@ -45,14 +45,13 @@ data BoolExpr =                -- all expression that give Bool as result
 data Command =
           Skip
         | IfElse BoolExpr [Command] [Command] -- probabile lista di comandi
-  | While BoolExpr [Command]
-  | ArithAssign String ArithExpr
-        | BoolAssign String BoolExpr  
-        | ArrAssign String ArithExpr ArithExpr --nome array + indice + numero da mettere all'interno
-  | ArithDeclare String ArithExpr
+        | While BoolExpr [Command]
+        | ArithDeclare String ArithExpr
         | BoolDeclare String BoolExpr
-        | ArrDeclare String ArithExpr 
-        | ArrFullAssign String ArrayExpr     -- array di tipo intero solo
+        | ArrayDeclare String ArithExpr
+        | ArithAssign String ArithExpr
+        | BoolAssign String BoolExpr  
+        | ArrayAssign String ArithExpr ArithExpr --nome array + indice + numero da mettere all'interno
   deriving Show
 
 type Program = [Command] 
