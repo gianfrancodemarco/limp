@@ -296,12 +296,15 @@ command =
   while <|>
   arithDeclare <|>
   boolDeclare <|>
-  arrayDeclare <|>
   arithAssign <|>
   boolAssign <|>
-  arrayAssign
+  arrayDeclare <|>
+  arrayAssign <|>
+  arrayConcat <|>
+  arrayFromDotProduct <|>
+  arrayFromScalarProduct
 
-program :: Parser [Command]         
+program :: Parser [Command]
 program = do many command
 
 
@@ -374,6 +377,21 @@ arrayDeclare =
     symbol "]"
     symbol ";"
     return (ArrayDeclare i length)
+  <|>
+  do
+    symbol "array"
+    i <- identifier
+    symbol "="
+    symbol "["
+    first <- aExp
+    rest <- many (
+         do
+            symbol ","
+            aExp
+      )
+    symbol "]"
+    symbol ";"
+    return (ArrayDeclareFullAssign i (first : rest))
 
 arithAssign :: Parser Command
 arithAssign =
@@ -404,6 +422,59 @@ arrayAssign =
     value <- aExp
     symbol ";"
     return (ArrayAssign i length value)
+  <|>
+  do
+    i <- identifier
+    symbol "="
+    symbol "["
+    first <- aExp
+    rest <- many (
+         do
+            symbol ","
+            aExp
+      )
+    symbol "]"
+    symbol ";"
+    return (ArrayFullAssign i (first : rest))
+
+arrayConcat :: Parser Command
+arrayConcat =
+  do
+    symbol "array"
+    destination <- identifier
+    symbol "="
+    symbol "concat"
+    headArray <- identifier
+    tailArray <- identifier
+    symbol ";"
+    return (ArrayFromConcat destination headArray tailArray)
+
+
+arrayFromDotProduct :: Parser Command
+arrayFromDotProduct =
+  do
+    symbol "array"
+    destination <- identifier
+    symbol "="
+    symbol "dot"
+    headArray <- identifier
+    tailArray <- identifier
+    symbol ";"
+    return (ArrayFromDotProduct destination headArray tailArray)
+
+
+arrayFromScalarProduct :: Parser Command
+arrayFromScalarProduct =
+  do
+    symbol "array"
+    destination <- identifier
+    symbol "="
+    symbol "scalar"
+    source <- identifier
+    scalar <- aExp
+    symbol ";"
+    return (ArrayFromScalarProduct destination source scalar)
+
 
 -- MAIN PARSE FUNCTIONS
 

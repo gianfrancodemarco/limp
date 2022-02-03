@@ -148,6 +148,8 @@ executeProgram env (( BoolDeclare identifier bExp ) : restOfCommands ) =
                                         where Just evaluated = boolExprEval env bExp
                 Nothing -> error "Error in BoolDeclare"
 
+
+-- array a[5];
 executeProgram env (( ArrayDeclare identifier lengthaExp ) : restOfCommands ) =
          case readEnv env identifier of
                 Just _ -> error "double ArrayDeclare"
@@ -155,6 +157,8 @@ executeProgram env (( ArrayDeclare identifier lengthaExp ) : restOfCommands ) =
                         where var = Variable identifier (ArrayType (getFilledArray length))
                               where Just length = arithExprEval env lengthaExp
 
+
+-- a[1] = 2;
 executeProgram env (( ArrayAssign identifier indexaExp valueaExp ) : restOfCommands ) =
         case readEnv env identifier of
               Just (ArrayType array) -> executeProgram (writeEnv env var) restOfCommands
@@ -164,3 +168,72 @@ executeProgram env (( ArrayAssign identifier indexaExp valueaExp ) : restOfComma
                                     Just value = arithExprEval env valueaExp
               Just _ -> error "Type mismatch in ArrayAssign"
               Nothing -> error "Trying to assign to an array that has not been declared"
+
+-- a = [1,2,3,4];
+executeProgram env (( ArrayFullAssign identifier valuesaExps ) : restOfCommands ) =
+        case readEnv env identifier of
+              Just (ArrayType array) -> executeProgram (writeEnv env var) restOfCommands
+                  where var = Variable identifier (ArrayType values)
+                              where values = map fromJust (map (arithExprEval env) valuesaExps)
+                                             where fromJust (Just x) = x
+              Just _ -> error "Type mismatch in ArrayAssign"
+              Nothing -> error "Trying to assign to an array that has not been declared"
+
+
+-- array a[4] = [1,2,3,4];
+executeProgram env (( ArrayDeclareFullAssign identifier valuesaExps ) : restOfCommands ) =
+        case readEnv env identifier of
+              Just _ -> error "double ArrayDeclareFullAssign"
+              Nothing -> executeProgram (writeEnv env var) restOfCommands
+                  where var = Variable identifier (ArrayType values)
+                              where values = map fromJust (map (arithExprEval env) valuesaExps)
+                                             where fromJust (Just x) = x
+
+
+-- destination = concat arr1 arr2;
+executeProgram env (( ArrayFromConcat destination headArray tailArray ) : restOfCommands ) =
+        case readEnv env destination of
+              Just _ -> error "ArrayFromConcat destination already in env"
+              Nothing -> case readEnv env headArray of
+                  Nothing -> error "headArray not in env"
+                  Just (ArrayType headArrayValues) ->
+                      case readEnv env tailArray of
+                          Nothing -> error "tailArray not in env"
+                          Just (ArrayType tailArrayValues) -> executeProgram (writeEnv env var) restOfCommands
+                                  where var = Variable destination (ArrayType values)
+                                              where values = headArrayValues ++ tailArrayValues
+                          Just _ -> error "type mismatch for tailArray"
+                  Just _ -> error "type mismatch for headArray"
+
+-- destination = dot arr1 arr2;
+executeProgram env (( ArrayFromDotProduct destination headArray tailArray ) : restOfCommands ) =
+        case readEnv env destination of
+              Just _ -> error "ArrayFromDotProduct destination already in env"
+              Nothing -> case readEnv env headArray of
+                  Nothing -> error "headArray not in env"
+                  Just (ArrayType headArrayValues) ->
+                      case readEnv env tailArray of
+                          Nothing -> error "tailArray not in env"
+                          Just (ArrayType tailArrayValues) ->
+                                  do
+                                    if length headArrayValues == length tailArrayValues
+                                      then do
+                                          let values = [x * y | (x,y) <- (zip headArrayValues tailArrayValues)]
+                                          let var = Variable destination (ArrayType values)
+                                          executeProgram (writeEnv env var) restOfCommands
+                                      else error "length mismatch between headArray and tailArray"
+                          Just _ -> error "type mismatch for tailArray"
+                  Just _ -> error "type mismatch for headArray"
+
+
+-- destination = dot arr1 3;
+executeProgram env (( ArrayFromScalarProduct destination source scalaraExp ) : restOfCommands ) =
+        case readEnv env destination of
+              Just _ -> error "ArrayFromScalarProduct destination already in env"
+              Nothing -> case readEnv env source of
+                  Nothing -> error "source not in env"
+                  Just (ArrayType sourceArrayValues) -> executeProgram (writeEnv env var) restOfCommands
+                      where var = Variable destination (ArrayType values)
+                                  where values = [x * scalar | x <- sourceArrayValues]
+                                                 where Just scalar = arithExprEval env scalaraExp
+                  Just _ -> error "type mismatch for headArray"

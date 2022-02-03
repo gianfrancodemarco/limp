@@ -48,10 +48,15 @@ data Command =
         | While BoolExpr [Command]
         | ArithDeclare String ArithExpr
         | BoolDeclare String BoolExpr
-        | ArrayDeclare String ArithExpr
+        | ArrayDeclare String ArithExpr                   -- array a[5];
+        | ArrayDeclareFullAssign String [ArithExpr]       -- array a[5] = [1,2,3,4,5];
         | ArithAssign String ArithExpr
         | BoolAssign String BoolExpr  
         | ArrayAssign String ArithExpr ArithExpr --nome array + indice + numero da mettere all'interno
+        | ArrayFullAssign String [ArithExpr]
+        | ArrayFromConcat String String String             -- destination = concat arr1 arr2; create an array from the concatanation of two other arrays
+        | ArrayFromDotProduct String String String
+        | ArrayFromScalarProduct String String ArithExpr
   deriving Show
 
 type Program = [Command] 
