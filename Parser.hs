@@ -187,7 +187,6 @@ integer = token int
 symbol :: String -> Parser String     
 symbol xs = token (string xs)
 
-
 -- ARITHMETIC EVALUATION --
 
 aExp  :: Parser ArithExpr         
@@ -301,8 +300,8 @@ command =
   arrayDeclare <|>
   arrayAssign <|>
   arrayConcat <|>
-  arrayFromDotProduct <|>
-  arrayFromScalarProduct
+  arrayDotProduct <|>
+  arrayScalarProduct
 
 program :: Parser [Command]
 program = do many command
@@ -314,6 +313,22 @@ skip  =
     symbol "skip"
     symbol ";"
     return Skip
+  <|> comment
+
+comment :: Parser Command
+comment =
+  do
+    symbol "/*"
+    endComment
+
+endComment =
+  do
+  symbol "*/"
+  return Skip
+  <|>
+  do
+  item
+  endComment
 
 ifElse :: Parser Command
 ifElse =
@@ -370,28 +385,31 @@ boolDeclare =
 arrayDeclare :: Parser Command
 arrayDeclare =
   do
-    symbol "array"
-    i <- identifier
-    symbol "["
-    length <- aExp
-    symbol "]"
-    symbol ";"
-    return (ArrayDeclare i length)
-  <|>
+  symbol "array"
   do
-    symbol "array"
-    i <- identifier
-    symbol "="
-    symbol "["
-    first <- aExp
-    rest <- many (
-         do
-            symbol ","
-            aExp
-      )
-    symbol "]"
-    symbol ";"
-    return (ArrayDeclareFullAssign i (first : rest))
+      i <- identifier
+      symbol "["
+      length <- aExp
+      symbol "]"
+      symbol ";"
+      return (ArrayDeclare i length)
+      <|> do
+          i <- identifier
+          symbol "="
+          symbol "["
+          first <- aExp
+          rest <- many (
+               do
+                  symbol ","
+                  aExp
+            )
+          symbol "]"
+          symbol ";"
+          return (ArrayDeclareFullAssign i (first : rest))
+      <|> arrayScalarProduct
+      <|> arrayDotProduct
+      <|> arrayConcat
+
 
 arithAssign :: Parser Command
 arithAssign =
@@ -436,11 +454,14 @@ arrayAssign =
     symbol "]"
     symbol ";"
     return (ArrayFullAssign i (first : rest))
+   <|> arrayScalarProduct
+   <|> arrayDotProduct
+   <|> arrayConcat
+
 
 arrayConcat :: Parser Command
 arrayConcat =
   do
-    symbol "array"
     destination <- identifier
     symbol "="
     symbol "concat"
@@ -448,32 +469,39 @@ arrayConcat =
     tailArray <- identifier
     symbol ";"
     return (ArrayFromConcat destination headArray tailArray)
-
-
-arrayFromDotProduct :: Parser Command
-arrayFromDotProduct =
+  <|>
   do
-    symbol "array"
+    destination <- identifier
+    symbol "="
+    headArray <- identifier
+    symbol "++"
+    tailArray <- identifier
+    symbol ";"
+    return (ArrayFromConcat destination headArray tailArray)
+
+
+arrayDotProduct :: Parser Command
+arrayDotProduct =
+  do
     destination <- identifier
     symbol "="
     symbol "dot"
     headArray <- identifier
     tailArray <- identifier
     symbol ";"
-    return (ArrayFromDotProduct destination headArray tailArray)
+    return (ArrayDotProduct destination headArray tailArray)
 
 
-arrayFromScalarProduct :: Parser Command
-arrayFromScalarProduct =
+arrayScalarProduct :: Parser Command
+arrayScalarProduct =
   do
-    symbol "array"
     destination <- identifier
     symbol "="
     symbol "scalar"
     source <- identifier
     scalar <- aExp
     symbol ";"
-    return (ArrayFromScalarProduct destination source scalar)
+    return (ArrayScalarProduct destination source scalar)
 
 
 -- MAIN PARSE FUNCTIONS

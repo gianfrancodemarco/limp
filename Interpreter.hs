@@ -9,9 +9,11 @@ import Array
 -- The Environment, representing the state of the program, is an array of Variables
 -- A Variable is an object defined by a name::string and a value::Type
 
-data Variable = Variable {name :: String, value :: Type } deriving Show
-type Env = [Variable]
+data Variable = Variable {name :: String, value :: Type }
+instance Show Variable where
+  show x = "\n" ++ (name x) ++ " = " ++ (show (value x))
 
+type Env = [Variable]
 
 
 -- We need two operations for the Env:
@@ -192,9 +194,7 @@ executeProgram env (( ArrayDeclareFullAssign identifier valuesaExps ) : restOfCo
 
 -- destination = concat arr1 arr2;
 executeProgram env (( ArrayFromConcat destination headArray tailArray ) : restOfCommands ) =
-        case readEnv env destination of
-              Just _ -> error "ArrayFromConcat destination already in env"
-              Nothing -> case readEnv env headArray of
+              case readEnv env headArray of
                   Nothing -> error "headArray not in env"
                   Just (ArrayType headArrayValues) ->
                       case readEnv env tailArray of
@@ -206,10 +206,8 @@ executeProgram env (( ArrayFromConcat destination headArray tailArray ) : restOf
                   Just _ -> error "type mismatch for headArray"
 
 -- destination = dot arr1 arr2;
-executeProgram env (( ArrayFromDotProduct destination headArray tailArray ) : restOfCommands ) =
-        case readEnv env destination of
-              Just _ -> error "ArrayFromDotProduct destination already in env"
-              Nothing -> case readEnv env headArray of
+executeProgram env (( ArrayDotProduct destination headArray tailArray ) : restOfCommands ) =
+              case readEnv env headArray of
                   Nothing -> error "headArray not in env"
                   Just (ArrayType headArrayValues) ->
                       case readEnv env tailArray of
@@ -227,10 +225,8 @@ executeProgram env (( ArrayFromDotProduct destination headArray tailArray ) : re
 
 
 -- destination = dot arr1 3;
-executeProgram env (( ArrayFromScalarProduct destination source scalaraExp ) : restOfCommands ) =
-        case readEnv env destination of
-              Just _ -> error "ArrayFromScalarProduct destination already in env"
-              Nothing -> case readEnv env source of
+executeProgram env (( ArrayScalarProduct destination source scalaraExp ) : restOfCommands ) =
+              case readEnv env source of
                   Nothing -> error "source not in env"
                   Just (ArrayType sourceArrayValues) -> executeProgram (writeEnv env var) restOfCommands
                       where var = Variable destination (ArrayType values)
