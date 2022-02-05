@@ -8,7 +8,6 @@ z = scalar x 3;
 array w = dot x y;
 w = dot x y;
 
-
 array t = concat x y;
 t = concat x y;
 asd = x ++ y;

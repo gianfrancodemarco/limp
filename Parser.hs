@@ -206,20 +206,24 @@ aTerm = do chain aFactor op
     where 
       op = 
         do
-          symbol "*";
+          symbol "*"
           return Mul
         <|>
         do
-          symbol "/";
+          symbol "/"
           return Div
         <|>
         do
-          symbol "^";
+          symbol "^"
           return Power
-
 
 aFactor :: Parser ArithExpr
 aFactor = do (Constant <$> integer)
+          <|>
+          do
+            symbol "top"
+            i <- identifier
+            return (StackTop i)
           <|>
           do
             i <- identifier
@@ -230,6 +234,7 @@ aFactor = do (Constant <$> integer)
             a <- aExp
             symbol ")"
             return a
+
 
 bExp :: Parser BoolExpr          
 bExp = chain bTerm op            
@@ -252,13 +257,17 @@ bFact =
       symbol "False"
       return (Boolean False)
     <|> do
-      symbol "Not"
+      symbol "not"
       Not <$> bExp
     <|> do
       symbol "("
       b <- bExp
       symbol ")"
       return b
+    <|> do
+      symbol "empty"
+      i <- identifier
+      return (StackEmpty i)
     <|> do 
         a1 <- aExp 
         do
@@ -301,7 +310,10 @@ command =
   arrayAssign <|>
   arrayConcat <|>
   arrayDotProduct <|>
-  arrayScalarProduct
+  arrayScalarProduct <|>
+  stackDeclare <|>
+  stackPush <|>
+  stackPop
 
 program :: Parser [Command]
 program = do many command
@@ -382,6 +394,27 @@ boolDeclare =
     symbol ";"
     return r
 
+arithAssign :: Parser Command
+arithAssign =
+  do
+    i <- identifier
+    symbol "="
+    r <- ArithAssign i <$> aExp 
+    symbol ";"
+    return r
+    
+boolAssign  :: Parser Command
+boolAssign  =
+  do
+    i <- identifier
+    symbol "="
+    r <- BoolAssign  i <$> bExp
+    symbol ";"
+    return r
+
+
+-- SECTION ARRAY --
+
 arrayDeclare :: Parser Command
 arrayDeclare =
   do
@@ -410,24 +443,6 @@ arrayDeclare =
       <|> arrayDotProduct
       <|> arrayConcat
 
-
-arithAssign :: Parser Command
-arithAssign =
-  do
-    i <- identifier
-    symbol "="
-    r <- ArithAssign i <$> aExp 
-    symbol ";"
-    return r
-    
-boolAssign  :: Parser Command
-boolAssign  =
-  do
-    i <- identifier
-    symbol "="
-    r <- BoolAssign  i <$> bExp
-    symbol ";"
-    return r
 
 arrayAssign :: Parser Command
 arrayAssign =
@@ -503,6 +518,40 @@ arrayScalarProduct =
     symbol ";"
     return (ArrayScalarProduct destination source scalar)
 
+-- END SECTION ARRAY --
+
+-- SECTION STACK --
+
+
+stackDeclare :: Parser Command
+stackDeclare =
+  do
+  symbol "stack"
+  i <- identifier
+  symbol ";"
+  return (StackDeclare i)
+
+
+stackPush :: Parser Command
+stackPush =
+  do
+  symbol "push"
+  i <- identifier
+  value <- aExp
+  symbol ";"
+  return (StackPush i value)
+
+
+stackPop :: Parser Command
+stackPop =
+  do
+  symbol "pop"
+  i <- identifier
+  symbol ";"
+  return (StackPop i)
+
+
+-- END SECTION STACK --
 
 -- MAIN PARSE FUNCTIONS
 

@@ -40,12 +40,17 @@ arithExprEval:: Env -> ArithExpr -> Maybe Int
 
 arithExprEval env (Constant i) = Just i
 
-arithExprEval env (ArithVariable i) = 
+arithExprEval env (ArithVariable i) =
         case readEnv env i of
                 Just (IntType v)-> Just v
                 Just _ -> error "type mismatch"
                 Nothing -> error "undeclared variable"
 
+arithExprEval env (StackTop i) =
+        case readEnv env i of
+                Just (StackType (v:vs)) -> Just v
+                Just _ -> error "type mismatch"
+                Nothing -> error "undeclared variable"
 
 arithExprEval env (Add a b) =  pure (+) <*> (arithExprEval env a) <*> (arithExprEval env b)
 
@@ -65,11 +70,19 @@ boolExprEval :: Env -> BoolExpr -> Maybe Bool
 
 boolExprEval env (Boolean b) = Just b
 
-boolExprEval env (BoolVariable s)=
+boolExprEval env (BoolVariable s) =
         case readEnv env s of
                 Just (BoolType v) -> Just v
                 Just _ -> error "type mismatch"
                 Nothing -> error "undeclared variable"
+
+boolExprEval env (StackEmpty s) =
+        case readEnv env s of
+                Just (StackType []) -> (Just True)
+                Just (StackType _) -> (Just False)
+                Just _ -> error "type mismatch"
+                Nothing -> error "undeclared variable"
+
 
 boolExprEval env (Lt a b) = pure (<) <*> (arithExprEval env a) <*> (arithExprEval env b)
 
@@ -121,7 +134,7 @@ executeProgram env ((ArithAssign identifier aExp) : restOfCommands) =
                                where var = Variable identifier (IntType evaluated)
                                         where Just evaluated = arithExprEval env aExp
                 Just _ -> error "Type mismatch in ArithAssign"
-                Nothing -> error "Error in ArithAssign"
+                Nothing -> error "Identifier not in env for ArithAssign"
 
 
 executeProgram env ((BoolAssign identifier bExp) : restOfCommands) =
@@ -130,7 +143,7 @@ executeProgram env ((BoolAssign identifier bExp) : restOfCommands) =
                                where var = Variable identifier (BoolType evaluated)
                                         where Just evaluated = boolExprEval env bExp
                 Just _ -> error "Type mismatch in BoolAssign"
-                Nothing -> error "Error in BoolAssign"
+                Nothing -> error "Identifier not in env for BoolAssign"
 
 executeProgram env (( ArithDeclare identifier aExp ) : restOfCommands ) =
         case arithExprEval env aExp of
@@ -233,3 +246,31 @@ executeProgram env (( ArrayScalarProduct destination source scalaraExp ) : restO
                                   where values = [x * scalar | x <- sourceArrayValues]
                                                  where Just scalar = arithExprEval env scalaraExp
                   Just _ -> error "type mismatch for headArray"
+
+
+-- stack myStack;
+executeProgram env (( StackDeclare stackName ) : restOfCommands ) =
+              case readEnv env stackName of
+                  Just _ -> error "double StackDeclare"
+                  Nothing -> executeProgram (writeEnv env var) restOfCommands
+                      where var = Variable stackName (StackType [])
+
+
+-- push myStack 3;
+executeProgram env (( StackPush stackName valueaExp ) : restOfCommands ) =
+              case readEnv env stackName of
+                  Nothing -> error "stackName not in env"
+                  Just (StackType stackValues) -> executeProgram (writeEnv env var) restOfCommands
+                      where var = Variable stackName (StackType (value : stackValues))
+                                  where Just value = arithExprEval env valueaExp
+                  Just _ -> error "type mismatch for stackName in StackPush"
+
+
+-- pop myStack;
+executeProgram env (( StackPop stackName ) : restOfCommands ) =
+              case readEnv env stackName of
+                  Nothing -> error "stackName not in env"
+                  Just (StackType (v:vs)) -> executeProgram (writeEnv env var) restOfCommands
+                      where var = Variable stackName (StackType vs)
+                  Just (StackType []) -> error "trying to pop from an empty stack"
+                  Just _ -> error "type mismatch for stackName in StackPop"

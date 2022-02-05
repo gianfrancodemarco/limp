@@ -7,6 +7,7 @@ data Type =
           IntType Int      -- all the types that i can manage in my Interpreter
         | BoolType Bool
         | ArrayType [Int]
+        | StackType [Int]
         deriving Show
 
 
@@ -19,13 +20,8 @@ data ArithExpr =              -- all expression that give Integer as result
         | Mul ArithExpr ArithExpr
         | Div ArithExpr ArithExpr
         | Power ArithExpr ArithExpr
+        | StackTop String
         deriving Show
-
-data ArrayExpr =                -- all expression that give Array as result
-        Array [ArithExpr]
-       | ArrayVariable String
-       deriving Show
-
 
 data BoolExpr =                -- all expression that give Bool as result
           Boolean Bool
@@ -39,6 +35,7 @@ data BoolExpr =                -- all expression that give Bool as result
         | And BoolExpr BoolExpr
         | Or BoolExpr BoolExpr
         | Not BoolExpr
+        | StackEmpty String
         deriving Show
 
 -- This defines the commands i'm going to use in my language
@@ -48,15 +45,19 @@ data Command =
         | While BoolExpr [Command]
         | ArithDeclare String ArithExpr
         | BoolDeclare String BoolExpr
-        | ArrayDeclare String ArithExpr                   -- array a[5];
-        | ArrayDeclareFullAssign String [ArithExpr]       -- array a[5] = [1,2,3,4,5];
         | ArithAssign String ArithExpr
-        | BoolAssign String BoolExpr  
-        | ArrayAssign String ArithExpr ArithExpr          -- array, index, value
+        | BoolAssign String BoolExpr
+        | ArrayDeclare String ArithExpr                  -- array a[5];
+        | ArrayDeclareFullAssign String [ArithExpr]      -- array a[5] = [1,2,3,4,5];
+        | ArrayAssign String ArithExpr ArithExpr         -- array, index, value
         | ArrayFullAssign String [ArithExpr]
-        | ArrayFromConcat String String String            -- destination = concat arr1 arr2; create an array from the concatanation of two other arrays
+        | ArrayFromConcat String String String           -- destination = concat arr1 arr2; create an array from the concatanation of two other arrays
         | ArrayDotProduct String String String
         | ArrayScalarProduct String String ArithExpr
+        | StackDeclare String
+        | StackPush String ArithExpr
+        | StackPop String
+
   deriving Show
 
 type Program = [Command] 

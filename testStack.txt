@@ -1,0 +1,12 @@
+stack a;
+push a 3;
+push a 4;
+push a 45;
+push a (3+1);
+array b[4];
+int i = 0;
+while(not empty a){
+  b[i] = top a;
+  i = i+1;
+  pop a;
+}
