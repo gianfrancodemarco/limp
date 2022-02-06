@@ -23,6 +23,8 @@ data ArithExpr =              -- all expression that give Integer as result
         | Power ArithExpr ArithExpr
         | StackTop String
         | QueueFirst String
+        | ArrayLength String
+        | ArrayPos String ArithExpr
         deriving Show
 
 data BoolExpr =                -- all expression that give Bool as result

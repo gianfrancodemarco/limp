@@ -58,6 +58,19 @@ arithExprEval env (QueueFirst i) =
                 Just _ -> error "type mismatch in QueueFirst"
                 Nothing -> error "undeclared variable in QueueFirst"
 
+arithExprEval env (ArrayLength array) =
+        case readEnv env array of
+                Just (ArrayType arrayValues) -> Just (length arrayValues)
+                Just _ -> error "type mismatch in QueueFirst"
+                Nothing -> error "undeclared variable in QueueFirst"
+
+arithExprEval env (ArrayPos array posaExp) =
+        case readEnv env array of
+                Just (ArrayType arrayValues) -> Just (arrayValues !! pos)
+                    where Just pos = arithExprEval env posaExp
+                Just _ -> error "type mismatch in QueueFirst"
+                Nothing -> error "undeclared variable in QueueFirst"
+
 
 arithExprEval env (Add a b) =  pure (+) <*> (arithExprEval env a) <*> (arithExprEval env b)
 

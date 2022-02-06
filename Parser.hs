@@ -231,6 +231,18 @@ aFactor = do (Constant <$> integer)
             return (QueueFirst i)
           <|>
           do
+            symbol "length"
+            i <- identifier
+            return (ArrayLength i)
+          <|>
+          do
+            i <- identifier
+            symbol "["
+            pos <- aExp
+            symbol "]"
+            return (ArrayPos i pos)
+          <|>
+          do
             i <- identifier
             return (ArithVariable i)
           <|>
@@ -281,7 +293,7 @@ bFact =
         a1 <- aExp 
         do
             symbol "<"
-            a2 <- aExp 
+            a2 <- aExp
             return (Lt a1 a2)
             <|> do
               symbol ">"
@@ -311,10 +323,10 @@ command =
   skip <|>
   ifElse <|>
   while <|>
-  arithDeclare <|>
   boolDeclare <|>
-  arithAssign <|>
   boolAssign <|>
+  arithDeclare <|>
+  arithAssign <|>
   arrayDeclare <|>
   arrayAssign <|>
   arrayFullAssign <|>
