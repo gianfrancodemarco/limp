@@ -242,7 +242,7 @@ aFactor = do (Constant <$> integer)
             symbol "]"
             return (ArrayPos i pos)
           <|>
-          do
+           do
             i <- identifier
             return (ArithVariable i)
           <|>
@@ -328,8 +328,8 @@ command =
   ifElse <|>
   while <|>
   boolDeclare <|>
-  boolAssign <|>
   arithDeclare <|>
+  boolAssign <|>
   arithAssign <|>
   arrayDeclare <|>
   arrayAssign <|>
@@ -407,9 +407,9 @@ arithDeclare =
     symbol "int"              -- int id = 4;
     i <- identifier
     symbol "="
-    r <- ArithDeclare i <$> aExp      
+    value <-  aExp
     symbol ";"
-    return r
+    return (ArithDeclare i value)
 
 boolDeclare :: Parser Command
 boolDeclare =
@@ -417,27 +417,27 @@ boolDeclare =
     symbol "bool"             -- bool id=True;
     i <- identifier
     symbol "="
-    r <- BoolDeclare i <$> bExp
+    value <- bExp
     symbol ";"
-    return r
+    return (BoolDeclare i value)
 
 arithAssign :: Parser Command
 arithAssign =
   do
     i <- identifier
     symbol "="
-    r <- ArithAssign i <$> aExp 
+    value <- aExp
     symbol ";"
-    return r
+    return (ArithAssign i value)
     
 boolAssign  :: Parser Command
 boolAssign  =
   do
     i <- identifier
     symbol "="
-    r <- BoolAssign  i <$> bExp
+    value <- bExp
     symbol ";"
-    return r
+    return (BoolAssign  i value)
 
 
 -- SECTION ARRAY  --

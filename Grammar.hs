@@ -56,10 +56,10 @@ data Command =
           Skip
         | IfElse BoolExpr [Command] [Command] -- probabile lista di comandi
         | While BoolExpr [Command]
-        | ArithDeclare String ArithExpr
         | BoolDeclare String BoolExpr
-        | ArithAssign String ArithExpr
+        | ArithDeclare String ArithExpr
         | BoolAssign String BoolExpr
+        | ArithAssign String ArithExpr
         | ArrayDeclare String ArrayExpr                  -- array a[5];
         | ArrayAssign String ArithExpr ArithExpr         -- array, index, value
         | ArrayFullAssign String ArrayExpr         -- array, index, value
