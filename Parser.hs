@@ -289,7 +289,12 @@ bFact =
       symbol "qempty"
       i <- identifier
       return (QueueEmpty i)
-    <|> do 
+    <|> do
+      symbol "bool("
+      i <- identifier
+      symbol ")"
+      return (BoolVariable i)
+    <|> do
         a1 <- aExp 
         do
             symbol "<"
@@ -315,7 +320,6 @@ bFact =
               symbol "!="
               a2 <- aExp 
               return (Neq a1 a2)
-    <|> (BoolVariable <$> identifier) 
 
 
 command :: Parser Command

@@ -7,7 +7,8 @@ bool swapped = True;
 
 /* We do the external cycle every time we do a swap in the internal cycle */
 
-while (swapped){
+/* We use bool(identifier) to tell apart from aExp */
+while (bool(swapped)){
 	
 	/* We reset the variables */
 	i = 0;
