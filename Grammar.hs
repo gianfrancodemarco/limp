@@ -8,6 +8,7 @@ data Type =
         | BoolType Bool
         | ArrayType [Int]
         | StackType [Int]
+        | QueueType [Int]
         deriving Show
 
 
@@ -21,6 +22,7 @@ data ArithExpr =              -- all expression that give Integer as result
         | Div ArithExpr ArithExpr
         | Power ArithExpr ArithExpr
         | StackTop String
+        | QueueFirst String
         deriving Show
 
 data BoolExpr =                -- all expression that give Bool as result
@@ -36,6 +38,15 @@ data BoolExpr =                -- all expression that give Bool as result
         | Or BoolExpr BoolExpr
         | Not BoolExpr
         | StackEmpty String
+        | QueueEmpty String
+        deriving Show
+
+data ArrayExpr =
+          ArrayInit ArithExpr
+        | ArrayFull [ArithExpr]
+        | ArrayConcat String String           -- destination = concat arr1 arr2; create an array from the concatanation of two other arrays
+        | ArrayDotProduct String String
+        | ArrayScalarProduct String ArithExpr
         deriving Show
 
 -- This defines the commands i'm going to use in my language
@@ -47,17 +58,15 @@ data Command =
         | BoolDeclare String BoolExpr
         | ArithAssign String ArithExpr
         | BoolAssign String BoolExpr
-        | ArrayDeclare String ArithExpr                  -- array a[5];
-        | ArrayDeclareFullAssign String [ArithExpr]      -- array a[5] = [1,2,3,4,5];
+        | ArrayDeclare String ArrayExpr                  -- array a[5];
         | ArrayAssign String ArithExpr ArithExpr         -- array, index, value
-        | ArrayFullAssign String [ArithExpr]
-        | ArrayFromConcat String String String           -- destination = concat arr1 arr2; create an array from the concatanation of two other arrays
-        | ArrayDotProduct String String String
-        | ArrayScalarProduct String String ArithExpr
+        | ArrayFullAssign String ArrayExpr         -- array, index, value
         | StackDeclare String
         | StackPush String ArithExpr
         | StackPop String
-
-  deriving Show
+        | QueueDeclare String
+        | QueueEnqueue String ArithExpr
+        | QueueDequeue String
+        deriving Show
 
 type Program = [Command] 

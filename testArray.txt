@@ -1,0 +1,38 @@
+array y[10];
+y[0] = 2;
+y[1] = 4;
+y[2] = 8;
+y[3] = 16;
+array x = scalar y 2;
+
+
+array z = [1,2,3,2^2,5,6,7,4*2,3*3,2*5];
+
+array t = x ++ z;
+array h = concat x z;
+array j = dot t h;
+
+
+array w[10];
+w = [1,2,3,4,5,6,7,8,9,10];
+
+array gg[10];
+gg = scalar w 10;
+
+array ggwp[10];
+ggwp = dot gg gg;
+
+
+/*
+array z = scalar x 3;
+z = scalar x 3;
+
+
+
+array w = dot x y;
+w = dot x y;
+
+array t = concat x y;
+t = concat x y;
+asd = x ++ y;
+*/

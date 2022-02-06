@@ -226,6 +226,11 @@ aFactor = do (Constant <$> integer)
             return (StackTop i)
           <|>
           do
+            symbol "first"
+            i <- identifier
+            return (QueueFirst i)
+          <|>
+          do
             i <- identifier
             return (ArithVariable i)
           <|>
@@ -268,6 +273,10 @@ bFact =
       symbol "empty"
       i <- identifier
       return (StackEmpty i)
+    <|> do
+      symbol "qempty"
+      i <- identifier
+      return (QueueEmpty i)
     <|> do 
         a1 <- aExp 
         do
@@ -308,12 +317,14 @@ command =
   boolAssign <|>
   arrayDeclare <|>
   arrayAssign <|>
-  arrayConcat <|>
-  arrayDotProduct <|>
-  arrayScalarProduct <|>
+  arrayFullAssign <|>
   stackDeclare <|>
   stackPush <|>
-  stackPop
+  stackPop <|>
+  queueDeclare <|>
+  queueEnqueue <|>
+  queueDequeue
+
 
 program :: Parser [Command]
 program = do many command
@@ -413,35 +424,79 @@ boolAssign  =
     return r
 
 
--- SECTION ARRAY --
+-- SECTION ARRAY  --
 
 arrayDeclare :: Parser Command
 arrayDeclare =
   do
-  symbol "array"
-  do
+    symbol "array"
+    i <- identifier
+    symbol "["
+    length <- aExp
+    symbol "]"
+    symbol ";"
+    return (ArrayDeclare i (ArrayInit length))
+    <|>
+    do
+      symbol "array"
       i <- identifier
-      symbol "["
-      length <- aExp
-      symbol "]"
+      symbol "="
+      arrayValues <- (
+        do
+          arrayFull
+          <|>
+          arrayScalarProduct
+          <|>
+          arrayConcat
+          <|>
+          arrayDotProduct
+        )
       symbol ";"
-      return (ArrayDeclare i length)
-      <|> do
-          i <- identifier
-          symbol "="
-          symbol "["
-          first <- aExp
-          rest <- many (
-               do
-                  symbol ","
-                  aExp
-            )
-          symbol "]"
-          symbol ";"
-          return (ArrayDeclareFullAssign i (first : rest))
-      <|> arrayScalarProduct
-      <|> arrayDotProduct
-      <|> arrayConcat
+      return (ArrayDeclare i arrayValues)
+
+arrayFull :: Parser ArrayExpr
+arrayFull =
+  do
+    symbol "["
+    first <- aExp
+    rest <- many (
+         do
+            symbol ","
+            aExp
+      )
+    symbol "]"
+    return (ArrayFull (first : rest))
+
+arrayScalarProduct :: Parser ArrayExpr
+arrayScalarProduct =
+  do
+    symbol "scalar"
+    source <- identifier
+    scalar <- aExp
+    return (ArrayScalarProduct source scalar)
+
+arrayConcat :: Parser ArrayExpr
+arrayConcat =
+  do
+    symbol "concat"
+    headArray <- identifier
+    tailArray <- identifier
+    return (ArrayConcat headArray tailArray)
+  <|>
+  do
+    headArray <- identifier
+    symbol "++"
+    tailArray <- identifier
+    return (ArrayConcat headArray tailArray)
+
+
+arrayDotProduct :: Parser ArrayExpr
+arrayDotProduct =
+  do
+    symbol "dot"
+    headArray <- identifier
+    tailArray <- identifier
+    return (ArrayDotProduct headArray tailArray)
 
 
 arrayAssign :: Parser Command
@@ -455,68 +510,26 @@ arrayAssign =
     value <- aExp
     symbol ";"
     return (ArrayAssign i length value)
-  <|>
+
+
+arrayFullAssign :: Parser Command
+arrayFullAssign =
   do
     i <- identifier
     symbol "="
-    symbol "["
-    first <- aExp
-    rest <- many (
-         do
-            symbol ","
-            aExp
+    arrayValues <- (
+      do
+        arrayFull
+        <|>
+        arrayScalarProduct
+        <|>
+        arrayConcat
+        <|>
+        arrayDotProduct
       )
-    symbol "]"
     symbol ";"
-    return (ArrayFullAssign i (first : rest))
-   <|> arrayScalarProduct
-   <|> arrayDotProduct
-   <|> arrayConcat
+    return (ArrayFullAssign i arrayValues)
 
-
-arrayConcat :: Parser Command
-arrayConcat =
-  do
-    destination <- identifier
-    symbol "="
-    symbol "concat"
-    headArray <- identifier
-    tailArray <- identifier
-    symbol ";"
-    return (ArrayFromConcat destination headArray tailArray)
-  <|>
-  do
-    destination <- identifier
-    symbol "="
-    headArray <- identifier
-    symbol "++"
-    tailArray <- identifier
-    symbol ";"
-    return (ArrayFromConcat destination headArray tailArray)
-
-
-arrayDotProduct :: Parser Command
-arrayDotProduct =
-  do
-    destination <- identifier
-    symbol "="
-    symbol "dot"
-    headArray <- identifier
-    tailArray <- identifier
-    symbol ";"
-    return (ArrayDotProduct destination headArray tailArray)
-
-
-arrayScalarProduct :: Parser Command
-arrayScalarProduct =
-  do
-    destination <- identifier
-    symbol "="
-    symbol "scalar"
-    source <- identifier
-    scalar <- aExp
-    symbol ";"
-    return (ArrayScalarProduct destination source scalar)
 
 -- END SECTION ARRAY --
 
@@ -551,7 +564,38 @@ stackPop =
   return (StackPop i)
 
 
+
 -- END SECTION STACK --
+
+-- SECTION QUEUE --
+
+queueDeclare :: Parser Command
+queueDeclare =
+  do
+  symbol "queue"
+  i <- identifier
+  symbol ";"
+  return (QueueDeclare i)
+
+
+queueEnqueue :: Parser Command
+queueEnqueue =
+  do
+  symbol "enqueue"
+  i <- identifier
+  value <- aExp
+  symbol ";"
+  return (QueueEnqueue i value)
+
+queueDequeue :: Parser Command
+queueDequeue =
+  do
+  symbol "dequeue"
+  i <- identifier
+  symbol ";"
+  return (QueueDequeue i)
+
+-- END SECTION QUEUE --
 
 -- MAIN PARSE FUNCTIONS
 

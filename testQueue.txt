@@ -1,0 +1,12 @@
+queue a;
+enqueue a 3;
+enqueue a 4;
+enqueue a 45;
+enqueue a (3+1);
+array b[4];
+int i = 0;
+while(not qempty a){
+  b[i] = first a;
+  i = i+1;
+  dequeue a;
+}
