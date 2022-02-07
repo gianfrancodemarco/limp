@@ -19,7 +19,7 @@ command ::=   <skip> ";"
           |   <queueDequeue> ";"
 		  
 		  
-skip ::=   "skip"
+skip ::=   "skip" | "/*" [<character>]* "*/"
 
 
 ifElse ::=    "if" "("<bExp>")" "{" <program> "}"
