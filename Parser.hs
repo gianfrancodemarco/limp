@@ -187,7 +187,7 @@ integer = token int
 symbol :: String -> Parser String     
 symbol xs = token (string xs)
 
--- ARITHMETIC EVALUATION --
+-- ARITHMETIC PARSING --
 
 aExp  :: Parser ArithExpr         
 aExp = do chain aTerm op
@@ -218,7 +218,9 @@ aTerm = do chain aFactor op
           return Power
 
 aFactor :: Parser ArithExpr
-aFactor = do (Constant <$> integer)
+aFactor = do
+            value <- integer
+            return (Constant value)
           <|>
           do
             symbol "top"
@@ -252,6 +254,7 @@ aFactor = do (Constant <$> integer)
             symbol ")"
             return a
 
+-- BOOLEAN PARSING --
 
 bExp :: Parser BoolExpr          
 bExp = chain bTerm op            
@@ -275,7 +278,8 @@ bFact =
       return (Boolean False)
     <|> do
       symbol "not"
-      Not <$> bExp
+      b <- bExp
+      return (Not b)
     <|> do
       symbol "("
       b <- bExp

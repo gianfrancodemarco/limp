@@ -15,7 +15,6 @@ data Type =
 data ArithExpr =              -- all expression that give Integer as result
           Constant Int
         | ArithVariable String
-        | ArrVariable String ArithExpr
         | Add ArithExpr ArithExpr
         | Sub ArithExpr ArithExpr
         | Mul ArithExpr ArithExpr
