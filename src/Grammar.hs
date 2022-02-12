@@ -4,7 +4,7 @@ module Grammar where
 
 
 data Type = 
-          IntType Int      -- all the types that i can manage in my Interpreter
+          IntType Int         -- all the types that i can manage in my Interpreter
         | BoolType Bool
         | ArrayType [Int]
         | StackType [Int]
@@ -45,7 +45,7 @@ data BoolExpr =                -- all expression that give Bool as result
 data ArrayExpr =
           ArrayInit ArithExpr
         | ArrayFull [ArithExpr]
-        | ArrayConcat String String           -- destination = concat arr1 arr2; create an array from the concatanation of two other arrays
+        | ArrayConcat String String
         | ArrayDotProduct String String
         | ArrayScalarProduct String ArithExpr
         deriving Show
@@ -53,7 +53,7 @@ data ArrayExpr =
 -- This defines the commands i'm going to use in my language
 data Command =
           Skip
-        | IfElse BoolExpr [Command] [Command] -- probabile lista di comandi
+        | IfElse BoolExpr [Command] [Command]
         | While BoolExpr [Command]
         | BoolDeclare String BoolExpr
         | ArithDeclare String ArithExpr
