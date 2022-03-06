@@ -1,4 +1,4 @@
-# limp
+# LIMP
 
 LIMP is a Lightweight Imperative language developed during the course of Formal Methods in Artificial Intelligence.
 
